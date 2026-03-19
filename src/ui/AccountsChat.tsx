@@ -578,7 +578,7 @@ export function AccountsChat({
 }) {
   const WELCOME: AssistantMessage = {
     role: "assistant",
-    text: `Hi! I can analyse your **${accounts.length} accounts**. Ask me anything — find at-risk accounts, compare metrics, surface expansion opportunities, or get your action plan for this week.`,
+    text: `Hi! I'm **Vejj**, your AI assistant. I can analyse your **${accounts.length} accounts** — find at-risk accounts, compare metrics, surface expansion opportunities, or build your action plan for this week.`,
   };
 
   const [messages, setMessages] = useState<Message[]>([WELCOME]);
@@ -631,12 +631,12 @@ export function AccountsChat({
       <div className="flex items-center gap-2 bg-zinc-900 px-4 py-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/20">
           <svg className="h-3.5 w-3.5 text-emerald-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="8" cy="8" r="6" />
-            <path d="M8 5v3l2 2" />
+            <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42" />
+            <circle cx="8" cy="8" r="2" fill="currentColor" stroke="none" />
           </svg>
         </div>
         <div className="flex-1">
-          <div className="text-[13px] font-semibold text-white">Account Intelligence</div>
+          <div className="text-[13px] font-semibold text-white">Vejj — AI Assistant</div>
           <div className="text-[10px] text-zinc-400">{accounts.length} accounts loaded</div>
         </div>
         <button

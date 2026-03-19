@@ -2,52 +2,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
-const ACCOUNTS_NAV = [
-  {
-    label: "All accounts",
-    href: "/accounts",
-    filter: null as string | null,
-    icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="1" y="1" width="6" height="6" rx="1.5" />
-        <rect x="9" y="1" width="6" height="6" rx="1.5" />
-        <rect x="1" y="9" width="6" height="6" rx="1.5" />
-        <rect x="9" y="9" width="6" height="6" rx="1.5" />
-      </svg>
-    ),
-  },
-  {
-    label: "High expansion",
-    href: "/accounts?filter=high-expansion",
-    filter: "high-expansion",
-    icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 13V3M3 8l5-5 5 5" />
-      </svg>
-    ),
-  },
-  {
-    label: "Needs follow-up",
-    href: "/accounts?filter=needs-follow-up",
-    filter: "needs-follow-up",
-    icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="8" cy="8" r="6" />
-        <path d="M8 5v3.5l2 2" />
-      </svg>
-    ),
-  },
-];
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const filter = searchParams.get("filter");
 
   const isDashboard = pathname === "/dashboard";
   const isPriorityActions = pathname === "/priority-actions";
+  const isResponseStudio = pathname === "/response-studio";
 
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col bg-zinc-900">
@@ -64,8 +27,62 @@ export function SidebarNav() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-4">
-        {/* Overview section */}
+        {/* Accounts section */}
         <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
+          Accounts
+        </div>
+        <Link
+          href="/accounts"
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-colors ${
+            pathname === "/accounts"
+              ? "bg-white/10 font-medium text-white"
+              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          }`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="1" width="6" height="6" rx="1.5" />
+            <rect x="9" y="1" width="6" height="6" rx="1.5" />
+            <rect x="1" y="9" width="6" height="6" rx="1.5" />
+            <rect x="9" y="9" width="6" height="6" rx="1.5" />
+          </svg>
+          All accounts
+        </Link>
+
+        {/* Automation section */}
+        <div className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
+          Automation
+        </div>
+        <Link
+          href="/actions"
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-colors ${
+            pathname.startsWith("/actions")
+              ? "bg-white/10 font-medium text-white"
+              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          }`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 2L4 9h4l-1 5 5-7H8l1-5z" />
+          </svg>
+          Growth Actions
+        </Link>
+        <Link
+          href="/response-studio"
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-colors ${
+            isResponseStudio
+              ? "bg-white/10 font-medium text-white"
+              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          }`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V4Z" />
+            <path d="M1 4l6 5 6-5" />
+            <path d="M11 2l2 2-2 2M13 4h-3" />
+          </svg>
+          Response Studio
+        </Link>
+
+        {/* Overview section */}
+        <div className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
           Overview
         </div>
         <Link
@@ -98,30 +115,6 @@ export function SidebarNav() {
           </svg>
           Dashboard
         </Link>
-
-        {/* Accounts section */}
-        <div className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-          Accounts
-        </div>
-        {ACCOUNTS_NAV.map((item) => {
-          const isActive =
-            pathname === "/accounts" &&
-            (item.filter === null ? !filter : filter === item.filter);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-colors ${
-                isActive
-                  ? "bg-white/10 font-medium text-white"
-                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
       </nav>
 
       {/* Footer */}

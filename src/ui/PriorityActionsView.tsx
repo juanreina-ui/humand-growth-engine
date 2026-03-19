@@ -271,7 +271,7 @@ export function PriorityActionsView({
             <circle cx="8" cy="8" r="6" />
             <path d="M8 5v3l2 2" />
           </svg>
-          Get full AI briefing
+          Ask Vejj for full briefing
         </button>
       </div>
 

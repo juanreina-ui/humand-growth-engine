@@ -52,12 +52,17 @@ type ScoredMetrics = {
   openDeals: number;
   engagedContacts: number;
   needSignals: number;
+  riskSignals: number;
+  sentiment: string;
+  topOpportunity: string;
 };
 
 type Props = {
   companyName: string;
   companySummary?: string;
   companyRevenue?: number;
+  ownerName?: string | null;
+  status: string;
   scored: ScoredMetrics;
   insights: Insights;
   deals: Deal[];
@@ -141,6 +146,8 @@ export function AccountDetailTabs({
   companyName,
   companySummary,
   companyRevenue,
+  ownerName,
+  status,
   scored,
   insights,
   deals,
@@ -237,9 +244,16 @@ export function AccountDetailTabs({
             </div>
             <OutreachMessageGenerator
               companyName={companyName}
-              headline={insights.headline}
-              bullets={insights.bullets}
-              recommendedExpansion={insights.recommendedExpansion}
+              status={status}
+              sentiment={scored.sentiment}
+              recentMeetings={scored.recentMeetings}
+              openDeals={scored.openDeals}
+              engagedContacts={scored.engagedContacts}
+              needSignals={scored.needSignals}
+              riskSignals={scored.riskSignals}
+              topOpportunity={scored.topOpportunity}
+              ownerName={ownerName}
+              companyRevenue={companyRevenue}
             />
           </Card>
 

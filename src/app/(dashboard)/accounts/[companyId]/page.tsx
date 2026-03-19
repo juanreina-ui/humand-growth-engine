@@ -124,11 +124,16 @@ export default async function AccountDetailPage({
         companyName={base.companyName}
         companySummary={detail.companySummary}
         companyRevenue={base.companyRevenue}
+        ownerName={base.ownerName}
+        status={statusLabel}
         scored={{
           recentMeetings: scored.recentMeetings,
           openDeals: scored.openDeals,
           engagedContacts: scored.engagedContacts,
           needSignals: scored.needSignals,
+          riskSignals: scored.riskSignals,
+          sentiment: scored.sentiment,
+          topOpportunity: scored.topOpportunity,
         }}
         insights={{
           headline: scoreInsight.headline,

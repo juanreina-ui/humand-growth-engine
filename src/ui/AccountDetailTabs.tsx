@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card } from "@/ui/Card";
 import { Badge } from "@/ui/Badge";
 import { OutreachMessageGenerator } from "@/ui/OutreachMessageGenerator";
+import { Tooltip } from "@/ui/Tooltip";
 
 type Insights = {
   headline: string;
@@ -88,20 +89,49 @@ function TabBtn({
   );
 }
 
+const METRIC_TOOLTIPS = {
+  meetings:
+    "Meetings held in the last 30 days. Each recent meeting adds up to 6 pts (max 25 pts) to the growth score.",
+  deals:
+    "Active commercial opportunities not yet closed, won, or lost. Each open deal contributes 8 pts (max 25 pts).",
+  contacts:
+    "Contacts with activity recorded in the last 30 days. Contributes up to 20 pts when 8 or more contacts are actively engaged.",
+  signals:
+    "Keywords detected in call transcripts: integrations, API, reporting, analytics, SSO, security, permissions, workflows, onboarding, billing. Each unique signal type adds 6 pts (max 20 pts).",
+};
+
 function MetricPill({
   label,
   value,
   color,
+  tooltipKey,
 }: {
   label: string;
   value: number;
   color: string;
+  tooltipKey: keyof typeof METRIC_TOOLTIPS;
 }) {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
-      <div className={`text-xl font-semibold tabular-nums ${color}`}>{value}</div>
-      <div className="mt-0.5 text-xs text-zinc-500">{label}</div>
-    </div>
+    <Tooltip content={METRIC_TOOLTIPS[tooltipKey]}>
+      <div className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-3">
+        <div className={`text-xl font-semibold tabular-nums ${color}`}>{value}</div>
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-zinc-500">
+          {label}
+          <svg
+            className="h-3 w-3 text-zinc-300"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="8" cy="8" r="6" />
+            <path d="M8 7v1M8 10.5v.5" />
+          </svg>
+        </div>
+      </div>
+    </Tooltip>
   );
 }
 
@@ -143,10 +173,10 @@ export function AccountDetailTabs({
         <div className="space-y-4">
           {/* Metrics strip */}
           <div className="grid grid-cols-4 gap-3">
-            <MetricPill label="Recent meetings" value={scored.recentMeetings} color="text-emerald-600" />
-            <MetricPill label="Open deals" value={scored.openDeals} color="text-sky-600" />
-            <MetricPill label="Engaged contacts" value={scored.engagedContacts} color="text-amber-600" />
-            <MetricPill label="Need signals" value={scored.needSignals} color="text-rose-500" />
+            <MetricPill label="Recent meetings" value={scored.recentMeetings} color="text-emerald-600" tooltipKey="meetings" />
+            <MetricPill label="Open deals" value={scored.openDeals} color="text-sky-600" tooltipKey="deals" />
+            <MetricPill label="Engaged contacts" value={scored.engagedContacts} color="text-amber-600" tooltipKey="contacts" />
+            <MetricPill label="Need signals" value={scored.needSignals} color="text-rose-500" tooltipKey="signals" />
           </div>
 
           {companySummary && (
@@ -157,8 +187,24 @@ export function AccountDetailTabs({
 
           {/* Main insight card */}
           <Card>
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              AI Insight
+            <div className="flex items-center gap-1.5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                AI Insight
+              </div>
+              <Tooltip content="Generated from growth score, engagement signals, open deals, and transcript summaries. Recalculated on every page load.">
+                <svg
+                  className="h-3 w-3 text-zinc-300"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="8" cy="8" r="6" />
+                  <path d="M8 7v1M8 10.5v.5" />
+                </svg>
+              </Tooltip>
             </div>
             <div className="mt-2 text-base font-semibold text-zinc-900">
               {insights.headline}
@@ -213,7 +259,6 @@ export function AccountDetailTabs({
       {/* ── Activity ── */}
       {tab === "activity" && (
         <div className="space-y-4">
-          {/* Transcripts */}
           {transcriptInsights.length > 0 && (
             <Card>
               <div className="text-sm font-semibold text-zinc-900">
@@ -235,9 +280,9 @@ export function AccountDetailTabs({
                     {t.signals.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {t.signals.slice(0, 6).map((s) => (
-                          <Badge key={s} intent="neutral">
-                            {s}
-                          </Badge>
+                          <Tooltip key={s} content="Signal keyword detected in this transcript. Signals inform the need score and feature gap analysis.">
+                            <Badge intent="neutral">{s}</Badge>
+                          </Tooltip>
                         ))}
                       </div>
                     )}
@@ -247,7 +292,6 @@ export function AccountDetailTabs({
             </Card>
           )}
 
-          {/* Deals table */}
           <Card>
             <div className="text-sm font-semibold text-zinc-900">Deals</div>
             <div className="mt-3 overflow-x-auto">
@@ -268,7 +312,7 @@ export function AccountDetailTabs({
                       <td className="py-2 pr-4 text-zinc-600">
                         {d.amount != null ? `$${d.amount.toLocaleString()}` : "—"}
                       </td>
-                      <td className="py-2 text-zinc-600">{d.closeDate ?? "—"}</td>
+                      <td className="py-2 text-zinc-600">{d.closeDate ? new Date(d.closeDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
                     </tr>
                   ))}
                   {deals.length === 0 && (
@@ -283,7 +327,6 @@ export function AccountDetailTabs({
             </div>
           </Card>
 
-          {/* Meetings table */}
           <Card>
             <div className="text-sm font-semibold text-zinc-900">Meetings</div>
             <div className="mt-3 overflow-x-auto">
@@ -298,7 +341,7 @@ export function AccountDetailTabs({
                 <tbody className="divide-y divide-zinc-100">
                   {meetings.map((m, idx) => (
                     <tr key={m.id ?? idx}>
-                      <td className="py-2 pr-4 text-zinc-500">{m.when ?? "—"}</td>
+                      <td className="py-2 pr-4 text-zinc-500">{m.when ? new Date(m.when).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</td>
                       <td className="py-2 pr-4 font-medium text-zinc-900">{m.title ?? "Meeting"}</td>
                       <td className="py-2 text-zinc-600">{m.ownerName ?? "—"}</td>
                     </tr>
@@ -342,7 +385,9 @@ export function AccountDetailTabs({
                   <div className="text-xs text-zinc-500">{c.title ?? "—"}</div>
                   <div className="text-xs text-zinc-400">{c.email ?? "—"}</div>
                   {c.engagement && (
-                    <Badge intent="neutral">{c.engagement}</Badge>
+                    <Tooltip content="Engagement status derived from CRM lifecycle stage, activity date, or contact status field.">
+                      <Badge intent="neutral">{c.engagement}</Badge>
+                    </Tooltip>
                   )}
                 </div>
               </div>

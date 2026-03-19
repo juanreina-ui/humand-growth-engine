@@ -273,7 +273,6 @@ function RenderText({ text }: { text: string }) {
   return (
     <div className="space-y-1 text-[13px] leading-5">
       {lines.map((line, i) => {
-        // render **bold** inline
         const parts = line.split(/(\*\*[^*]+\*\*)/g);
         const rendered = parts.map((part, j) =>
           part.startsWith("**") && part.endsWith("**") ? (
@@ -345,7 +344,13 @@ const SUGGESTIONS = [
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function AccountsChat({ accounts, onClose }: { accounts: ChatAccount[]; onClose?: () => void }) {
+export function AccountsChat({
+  accounts,
+  onClose,
+}: {
+  accounts: ChatAccount[];
+  onClose?: () => void;
+}) {
   const WELCOME: AssistantMessage = {
     role: "assistant",
     text: `Hi! I can analyse your **${accounts.length} accounts**. Ask me anything — find similar customers, compare metrics, or surface risks and opportunities.`,
@@ -355,14 +360,14 @@ export function AccountsChat({ accounts, onClose }: { accounts: ChatAccount[]; o
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
   function newChat() {
     setMessages([{ ...WELCOME }]);
     setInput("");
   }
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   function send(text: string) {
     const q = text.trim();
@@ -427,7 +432,14 @@ export function AccountsChat({ accounts, onClose }: { accounts: ChatAccount[]; o
             title="Close"
             className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 transition hover:bg-white/10 hover:text-white"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
               <path d="M4 4l8 8M12 4l-8 8" />
             </svg>
           </button>
@@ -435,9 +447,15 @@ export function AccountsChat({ accounts, onClose }: { accounts: ChatAccount[]; o
       </div>
 
       {/* Messages */}
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4" style={{ maxHeight: "calc(100vh - 260px)", minHeight: 320 }}>
+      <div
+        className="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+        style={{ minHeight: 0 }}
+      >
         {messages.map((msg, i) => (
-          <div key={i} className={`flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}>
+          <div
+            key={i}
+            className={`flex flex-col gap-2 ${msg.role === "user" ? "items-end" : "items-start"}`}
+          >
             {msg.role === "user" ? (
               <div className="max-w-[85%] rounded-2xl rounded-br-sm bg-zinc-900 px-3 py-2 text-[13px] text-white">
                 {msg.text}
@@ -461,7 +479,7 @@ export function AccountsChat({ accounts, onClose }: { accounts: ChatAccount[]; o
         <div ref={bottomRef} />
       </div>
 
-      {/* Suggestions (only shown before first user message) */}
+      {/* Suggestions */}
       {messages.length === 1 && (
         <div className="flex flex-wrap gap-1.5 px-4 pb-2">
           {SUGGESTIONS.map((s) => (

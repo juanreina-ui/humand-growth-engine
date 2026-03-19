@@ -5,6 +5,7 @@ import {
   coerceString,
   pickFirstString,
 } from "@/lib/growth/coerce";
+import { DEMO_BASES, DEMO_DETAILS } from "@/lib/demo/accounts";
 
 export type AccountBase = {
   companyId: string;
@@ -54,6 +55,13 @@ export type AccountDetail = {
 
 type QueryResult<T> = { data: T[] | null; error: { message: string } | null };
 
+function ownerDisplayName(o: Record<string, unknown>): string | undefined {
+  const first = coerceString(o.first_name);
+  const last = coerceString(o.last_name);
+  if (first || last) return [first, last].filter(Boolean).join(" ");
+  return pickFirstString(o, ["name", "full_name", "email", "owner_name"]);
+}
+
 export async function getAccountsOverview(): Promise<{
   accounts: AccountBase[];
   warnings: string[];
@@ -64,7 +72,7 @@ export async function getAccountsOverview(): Promise<{
     supabase = getSupabaseServerClient();
   } catch (e) {
     return {
-      accounts: [],
+      accounts: DEMO_BASES,
       warnings: [e instanceof Error ? e.message : "Supabase client error"],
     };
   }
@@ -72,11 +80,11 @@ export async function getAccountsOverview(): Promise<{
   const companiesRes = (await supabase
     .from("companies")
     .select("*")
-    .limit(200)) as QueryResult<Record<string, unknown>>;
+    .limit(500)) as QueryResult<Record<string, unknown>>;
 
   if (companiesRes.error) {
     return {
-      accounts: [],
+      accounts: DEMO_BASES,
       warnings: [`companies query failed: ${companiesRes.error.message}`],
     };
   }
@@ -113,24 +121,24 @@ export async function getAccountsOverview(): Promise<{
     const ownerId =
       coerceString(c.owner_id) ??
       coerceString(c.ownerId) ??
-      coerceString(c.hs_owner_id);
+      coerceString(c.hs_owner_id) ??
+      coerceString(c.cx_owner);
 
     const owner =
       ownerId && ownersById.has(ownerId) ? ownersById.get(ownerId) : undefined;
 
-    const ownerName = owner
-      ? pickFirstString(owner, ["name", "full_name", "email", "owner_name"])
-      : undefined;
+    const ownerName = owner ? ownerDisplayName(owner) : undefined;
 
     const companyRevenue = coerceNumber(
-      (c as Record<string, unknown>).revenue ??
-        (c as Record<string, unknown>).annual_revenue ??
+      (c as Record<string, unknown>).annual_revenue ??
+        (c as Record<string, unknown>).revenue ??
         (c as Record<string, unknown>).arr,
     );
     const companySize = coerceNumber(
-      (c as Record<string, unknown>).size ??
+      (c as Record<string, unknown>).number_of_employees ??
         (c as Record<string, unknown>).employee_count ??
-        (c as Record<string, unknown>).employees,
+        (c as Record<string, unknown>).employees ??
+        (c as Record<string, unknown>).size,
     );
 
     const companySummary =
@@ -150,13 +158,14 @@ export async function getAccountsOverview(): Promise<{
   });
 
   const valid = accounts.filter((a) => a.companyId);
-  if (valid.length === 0 && accounts.length > 0) {
-    warnings.push(
-      "Could not detect a company id column (expected one of: id/company_id/hs_object_id).",
-    );
-  }
 
-  return { accounts: valid, warnings };
+  // Merge demo accounts (avoid duplicating if real DB already has them)
+  const existingIds = new Set(valid.map((a) => a.companyId));
+  const merged = [
+    ...valid,
+    ...DEMO_BASES.filter((d) => !existingIds.has(d.companyId)),
+  ];
+  return { accounts: merged, warnings };
 }
 
 export async function getAccountsOverviewById(
@@ -177,12 +186,20 @@ export async function getAccountsSignals(companyIds: string[]): Promise<{
   >();
 
   for (const id of companyIds) {
-    byCompanyId.set(id, {
-      deals: [],
-      meetings: [],
-      contacts: [],
-      transcriptInsights: [],
-    });
+    byCompanyId.set(id, { deals: [], meetings: [], contacts: [], transcriptInsights: [] });
+  }
+
+  // Inject demo signals first (works even if Supabase fails)
+  for (const id of companyIds) {
+    if (id.startsWith("demo-") && DEMO_DETAILS[id]) {
+      const d = DEMO_DETAILS[id];
+      byCompanyId.set(id, {
+        deals: d.deals,
+        meetings: d.meetings,
+        contacts: d.contacts,
+        transcriptInsights: d.transcriptInsights,
+      });
+    }
   }
 
   let supabase;
@@ -195,128 +212,156 @@ export async function getAccountsSignals(companyIds: string[]): Promise<{
     };
   }
 
-  const ids = companyIds.filter(Boolean).slice(0, 200);
-  if (ids.length === 0) return { byCompanyId, warnings };
+  const realIds = companyIds.filter((id) => !id.startsWith("demo-") && id).slice(0, 200);
+  if (realIds.length === 0) return { byCompanyId, warnings };
 
+  // ── Deals ──────────────────────────────────────────────────────────────────
   const dealsRes = (await supabase
     .from("deals")
     .select("*")
-    .in("company_id", ids)
+    .in("company_id", realIds)
     .limit(2000)) as QueryResult<Record<string, unknown>>;
-  if (dealsRes.error) warnings.push(`deals overview query failed: ${dealsRes.error.message}`);
+  if (dealsRes.error) warnings.push(`deals query failed: ${dealsRes.error.message}`);
   for (const d of dealsRes.data ?? []) {
     const cid = coerceString(d.company_id);
     if (!cid || !byCompanyId.has(cid)) continue;
     byCompanyId.get(cid)!.deals.push({
       id: coerceString(d.id) ?? coerceString(d.deal_id),
-      name: coerceString(d.name) ?? coerceString(d.dealname),
-      stage: coerceString(d.stage) ?? coerceString(d.dealstage),
+      name: coerceString(d.deal_name) ?? coerceString(d.name) ?? coerceString(d.dealname),
+      stage: coerceString(d.deal_stage) ?? coerceString(d.stage) ?? coerceString(d.dealstage),
       status: coerceString(d.status),
       amount: coerceNumber(d.amount) ?? coerceNumber(d.deal_amount),
       closeDate: coerceDateString(d.close_date) ?? coerceDateString(d.closedate),
     });
   }
 
-  const meetingsRes = (await supabase
-    .from("meetings")
-    .select("*")
-    .in("company_id", ids)
-    .limit(2000)) as QueryResult<Record<string, unknown>>;
-  if (meetingsRes.error)
-    warnings.push(`meetings overview query failed: ${meetingsRes.error.message}`);
-  for (const m of meetingsRes.data ?? []) {
-    const cid = coerceString(m.company_id);
-    if (!cid || !byCompanyId.has(cid)) continue;
-    byCompanyId.get(cid)!.meetings.push({
-      id: coerceString(m.id) ?? coerceString(m.meeting_id),
-      title: coerceString(m.title) ?? coerceString(m.subject),
-      when:
-        coerceDateString(m.occurred_at) ??
-        coerceDateString(m.start_time) ??
-        coerceDateString(m.created_at),
-      ownerId: coerceString(m.owner_id) ?? coerceString(m.hs_owner_id),
-      ownerName:
-        coerceString(m.owner_name) ??
-        coerceString(m.organizer) ??
-        coerceString(m.owner),
-    });
-  }
-
+  // ── Contacts (needed for meeting + transcript lookups) ─────────────────────
   const contactsRes = (await supabase
     .from("contacts")
-    .select("*")
-    .in("company_id", ids)
+    .select("id,company_id,first_name,last_name,email,job_title,lifecycle_stage,lead_status,updated_at")
+    .in("company_id", realIds)
     .limit(5000)) as QueryResult<Record<string, unknown>>;
-  if (contactsRes.error)
-    warnings.push(`contacts overview query failed: ${contactsRes.error.message}`);
+  if (contactsRes.error) warnings.push(`contacts query failed: ${contactsRes.error.message}`);
+
+  // Map contactId → companyId for later junction lookups
+  const contactToCompany = new Map<string, string>();
   for (const c of contactsRes.data ?? []) {
     const cid = coerceString(c.company_id);
-    if (!cid || !byCompanyId.has(cid)) continue;
+    const contactId = coerceString(c.id);
+    if (!cid || !contactId || !byCompanyId.has(cid)) continue;
+    contactToCompany.set(contactId, cid);
+    const first = coerceString(c.first_name);
+    const last = coerceString(c.last_name);
+    const name = (first || last) ? [first, last].filter(Boolean).join(" ") : undefined;
     byCompanyId.get(cid)!.contacts.push({
-      id: coerceString(c.id) ?? coerceString(c.contact_id),
-      name: (() => {
-        const direct = pickFirstString(c, ["name", "full_name"]);
-        if (direct) return direct;
-        const joined = [coerceString(c.first_name), coerceString(c.last_name)]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
-        return joined || undefined;
-      })(),
+      id: contactId,
+      name,
       email: coerceString(c.email),
-      title: coerceString(c.title) ?? coerceString(c.job_title),
-      engagement:
-        coerceString(c.engagement) ??
-        coerceString(c.lifecycle_stage) ??
-        coerceString(c.status),
-      lastActivityAt:
-        coerceDateString(c.last_activity_at) ??
-        coerceDateString(c.last_contacted_at),
+      title: coerceString(c.job_title),
+      engagement: coerceString(c.lifecycle_stage) ?? coerceString(c.lead_status),
+      lastActivityAt: coerceDateString(c.updated_at),
     });
   }
 
-  const transcriptsRes = (await supabase
-    .from("call_transcripts")
-    .select("*")
-    .in("company_id", ids)
-    .limit(2000)) as QueryResult<Record<string, unknown>>;
-  if (transcriptsRes.error)
-    warnings.push(`call_transcripts overview query failed: ${transcriptsRes.error.message}`);
-  for (const t of transcriptsRes.data ?? []) {
-    const cid = coerceString(t.company_id);
-    if (!cid || !byCompanyId.has(cid)) continue;
-    const summary =
-      coerceString(t.summary) ??
-      coerceString(t.call_summary) ??
-      coerceString(t.notes) ??
-      coerceString(t.transcript_excerpt) ??
-      coerceString(t.transcript);
-    if (!summary) continue;
+  const allContactIds = [...contactToCompany.keys()];
+  if (allContactIds.length === 0) return { byCompanyId, warnings };
 
-    const title =
-      coerceString(t.title) ?? coerceString(t.subject) ?? coerceString(t.call_title);
-    const signalsRaw =
-      coerceString(t.signals) ?? coerceString(t.tags) ?? coerceString(t.key_topics);
-    const signals = signalsRaw
-      ? signalsRaw
-          .split(/,|\n|;|•/g)
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .slice(0, 20)
-      : [];
+  // ── Meetings via meeting_contacts junction ─────────────────────────────────
+  const mcRes = (await supabase
+    .from("meeting_contacts")
+    .select("meeting_id,contact_id")
+    .in("contact_id", allContactIds)
+    .limit(5000)) as QueryResult<Record<string, unknown>>;
+  if (mcRes.error) warnings.push(`meeting_contacts query failed: ${mcRes.error.message}`);
 
-    byCompanyId.get(cid)!.transcriptInsights.push({
-      id: coerceString(t.id) ?? coerceString(t.transcript_id),
-      title,
-      summary,
-      signals,
-    });
+  const meetingToCompanies = new Map<string, Set<string>>();
+  for (const row of mcRes.data ?? []) {
+    const mid = coerceString(row.meeting_id);
+    const cid = coerceString(row.contact_id) ? contactToCompany.get(coerceString(row.contact_id)!) : undefined;
+    if (!mid || !cid) continue;
+    if (!meetingToCompanies.has(mid)) meetingToCompanies.set(mid, new Set());
+    meetingToCompanies.get(mid)!.add(cid);
+  }
+
+  if (meetingToCompanies.size > 0) {
+    const meetingIds = [...meetingToCompanies.keys()].slice(0, 2000);
+    const meetingsRes = (await supabase
+      .from("meetings")
+      .select("id,title,start_time,owner_id")
+      .in("id", meetingIds)
+      .limit(2000)) as QueryResult<Record<string, unknown>>;
+    if (meetingsRes.error) warnings.push(`meetings query failed: ${meetingsRes.error.message}`);
+    for (const m of meetingsRes.data ?? []) {
+      const mid = coerceString(m.id);
+      if (!mid) continue;
+      const companiesForMeeting = meetingToCompanies.get(mid);
+      if (!companiesForMeeting) continue;
+      for (const cid of companiesForMeeting) {
+        if (!byCompanyId.has(cid)) continue;
+        byCompanyId.get(cid)!.meetings.push({
+          id: mid,
+          title: coerceString(m.title),
+          when: coerceDateString(m.start_time),
+          ownerId: coerceString(m.owner_id),
+        });
+      }
+    }
+  }
+
+  // ── Transcripts via call_transcript_contacts junction ──────────────────────
+  const tcRes = (await supabase
+    .from("call_transcript_contacts")
+    .select("call_transcript_id,contact_id")
+    .in("contact_id", allContactIds)
+    .limit(5000)) as QueryResult<Record<string, unknown>>;
+  if (tcRes.error) warnings.push(`call_transcript_contacts query failed: ${tcRes.error.message}`);
+
+  const transcriptToCompanies = new Map<string, Set<string>>();
+  for (const row of tcRes.data ?? []) {
+    const tid = coerceString(row.call_transcript_id);
+    const contactId = coerceString(row.contact_id);
+    const cid = contactId ? contactToCompany.get(contactId) : undefined;
+    if (!tid || !cid) continue;
+    if (!transcriptToCompanies.has(tid)) transcriptToCompanies.set(tid, new Set());
+    transcriptToCompanies.get(tid)!.add(cid);
+  }
+
+  if (transcriptToCompanies.size > 0) {
+    const transcriptIds = [...transcriptToCompanies.keys()].slice(0, 2000);
+    const trRes = (await supabase
+      .from("call_transcripts")
+      .select("id,title,summary,started_at")
+      .in("id", transcriptIds)
+      .limit(2000)) as QueryResult<Record<string, unknown>>;
+    if (trRes.error) warnings.push(`call_transcripts query failed: ${trRes.error.message}`);
+    for (const t of trRes.data ?? []) {
+      const tid = coerceString(t.id);
+      if (!tid) continue;
+      const summary = coerceString(t.summary);
+      if (!summary) continue;
+      const companiesForTranscript = transcriptToCompanies.get(tid);
+      if (!companiesForTranscript) continue;
+      for (const cid of companiesForTranscript) {
+        if (!byCompanyId.has(cid)) continue;
+        byCompanyId.get(cid)!.transcriptInsights.push({
+          id: tid,
+          title: coerceString(t.title),
+          summary,
+          signals: [],
+        });
+      }
+    }
   }
 
   return { byCompanyId, warnings };
 }
 
 export async function getAccountDetail(companyId: string): Promise<AccountDetail> {
+  // Return demo detail directly for demo accounts
+  if (companyId.startsWith("demo-") && DEMO_DETAILS[companyId]) {
+    return DEMO_DETAILS[companyId];
+  }
+
   const warnings: string[] = [];
   let supabase;
   try {
@@ -341,64 +386,41 @@ export async function getAccountDetail(companyId: string): Promise<AccountDetail
     warnings,
   };
 
+  // ── Company summary ────────────────────────────────────────────────────────
   const companiesRes = (await supabase
     .from("companies")
-    .select("*")
+    .select("summary,description,notes")
     .eq("id", companyId)
     .limit(1)) as QueryResult<Record<string, unknown>>;
-
-  if (!companiesRes.error && (companiesRes.data?.[0] ?? null)) {
-    const c = companiesRes.data![0];
+  if (!companiesRes.error && companiesRes.data?.[0]) {
+    const c = companiesRes.data[0];
     detail.companySummary =
       coerceString(c.summary) ??
       coerceString(c.description) ??
       coerceString(c.notes);
   }
 
+  // ── Deals ──────────────────────────────────────────────────────────────────
   const dealsRes = (await supabase
     .from("deals")
     .select("*")
     .eq("company_id", companyId)
-    .order("created_at", { ascending: false })
+    .order("create_date", { ascending: false })
     .limit(50)) as QueryResult<Record<string, unknown>>;
   if (dealsRes.error) {
     warnings.push(`deals query failed: ${dealsRes.error.message}`);
   } else {
     detail.deals = (dealsRes.data ?? []).map((d) => ({
       id: coerceString(d.id) ?? coerceString(d.deal_id),
-      name: coerceString(d.name) ?? coerceString(d.dealname),
-      stage: coerceString(d.stage) ?? coerceString(d.dealstage),
+      name: coerceString(d.deal_name) ?? coerceString(d.name) ?? coerceString(d.dealname),
+      stage: coerceString(d.deal_stage) ?? coerceString(d.stage) ?? coerceString(d.dealstage),
       status: coerceString(d.status),
       amount: coerceNumber(d.amount) ?? coerceNumber(d.deal_amount),
-      closeDate:
-        coerceDateString(d.close_date) ?? coerceDateString(d.closedate),
+      closeDate: coerceDateString(d.close_date) ?? coerceDateString(d.closedate),
     }));
   }
 
-  const meetingsRes = (await supabase
-    .from("meetings")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("occurred_at", { ascending: false })
-    .limit(50)) as QueryResult<Record<string, unknown>>;
-  if (meetingsRes.error) {
-    warnings.push(`meetings query failed: ${meetingsRes.error.message}`);
-  } else {
-    detail.meetings = (meetingsRes.data ?? []).map((m) => ({
-      id: coerceString(m.id) ?? coerceString(m.meeting_id),
-      title: coerceString(m.title) ?? coerceString(m.subject),
-      when:
-        coerceDateString(m.occurred_at) ??
-        coerceDateString(m.start_time) ??
-        coerceDateString(m.created_at),
-      ownerId: coerceString(m.owner_id) ?? coerceString(m.hs_owner_id),
-      ownerName:
-        coerceString(m.owner_name) ??
-        coerceString(m.organizer) ??
-        coerceString(m.owner),
-    }));
-  }
-
+  // ── Contacts ───────────────────────────────────────────────────────────────
   const contactsRes = (await supabase
     .from("contacts")
     .select("*")
@@ -408,77 +430,92 @@ export async function getAccountDetail(companyId: string): Promise<AccountDetail
   if (contactsRes.error) {
     warnings.push(`contacts query failed: ${contactsRes.error.message}`);
   } else {
-    detail.contacts = (contactsRes.data ?? []).map((c) => ({
-      id: coerceString(c.id) ?? coerceString(c.contact_id),
-      name: (() => {
-        const direct = pickFirstString(c, ["name", "full_name"]);
-        if (direct) return direct;
-        const joined = [coerceString(c.first_name), coerceString(c.last_name)]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
-        return joined || undefined;
-      })(),
-      email: coerceString(c.email),
-      title: coerceString(c.title) ?? coerceString(c.job_title),
-      engagement:
-        coerceString(c.engagement) ??
-        coerceString(c.lifecycle_stage) ??
-        coerceString(c.status),
-      lastActivityAt:
-        coerceDateString(c.last_activity_at) ??
-        coerceDateString(c.last_contacted_at),
-    }));
+    detail.contacts = (contactsRes.data ?? []).map((c) => {
+      const first = coerceString(c.first_name);
+      const last = coerceString(c.last_name);
+      const name = (first || last)
+        ? [first, last].filter(Boolean).join(" ")
+        : pickFirstString(c, ["name", "full_name"]) ?? undefined;
+      return {
+        id: coerceString(c.id) ?? coerceString(c.contact_id),
+        name,
+        email: coerceString(c.email),
+        title: coerceString(c.job_title) ?? coerceString(c.title),
+        engagement: coerceString(c.lifecycle_stage) ?? coerceString(c.lead_status) ?? coerceString(c.engagement),
+        lastActivityAt: coerceDateString(c.updated_at) ?? coerceDateString(c.last_activity_at),
+      };
+    });
   }
 
-  const transcriptsRes = (await supabase
-    .from("call_transcripts")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("created_at", { ascending: false })
-    .limit(50)) as QueryResult<Record<string, unknown>>;
-  if (transcriptsRes.error) {
-    warnings.push(
-      `call_transcripts query failed: ${transcriptsRes.error.message}`,
-    );
-  } else {
-    detail.transcriptInsights = (transcriptsRes.data ?? [])
-      .map((t) => {
-        const summary =
-          coerceString(t.summary) ??
-          coerceString(t.call_summary) ??
-          coerceString(t.notes) ??
-          coerceString(t.transcript_excerpt) ??
-          coerceString(t.transcript);
-        if (!summary) return null;
+  const contactIds = detail.contacts.map((c) => c.id).filter(Boolean) as string[];
 
-        const title =
-          coerceString(t.title) ??
-          coerceString(t.subject) ??
-          coerceString(t.call_title);
+  // ── Meetings via meeting_contacts junction ─────────────────────────────────
+  if (contactIds.length > 0) {
+    const mcRes = (await supabase
+      .from("meeting_contacts")
+      .select("meeting_id")
+      .in("contact_id", contactIds)
+      .limit(500)) as QueryResult<Record<string, unknown>>;
+    if (mcRes.error) {
+      warnings.push(`meeting_contacts query failed: ${mcRes.error.message}`);
+    } else {
+      const meetingIds = [...new Set((mcRes.data ?? []).map((r) => coerceString(r.meeting_id)).filter(Boolean) as string[])].slice(0, 200);
+      if (meetingIds.length > 0) {
+        const meetingsRes = (await supabase
+          .from("meetings")
+          .select("id,title,start_time,owner_id")
+          .in("id", meetingIds)
+          .order("start_time", { ascending: false })
+          .limit(100)) as QueryResult<Record<string, unknown>>;
+        if (meetingsRes.error) {
+          warnings.push(`meetings query failed: ${meetingsRes.error.message}`);
+        } else {
+          detail.meetings = (meetingsRes.data ?? []).map((m) => ({
+            id: coerceString(m.id),
+            title: coerceString(m.title),
+            when: coerceDateString(m.start_time),
+            ownerId: coerceString(m.owner_id),
+          }));
+        }
+      }
+    }
 
-        const signalsRaw =
-          coerceString(t.signals) ??
-          coerceString(t.tags) ??
-          coerceString(t.key_topics);
-        const signals = signalsRaw
-          ? signalsRaw
-              .split(/,|\n|;|•/g)
-              .map((s) => s.trim())
-              .filter(Boolean)
-              .slice(0, 20)
-          : [];
-
-        return {
-          id: coerceString(t.id) ?? coerceString(t.transcript_id),
-          title,
-          summary,
-          signals,
-        } satisfies TranscriptInsight;
-      })
-      .filter(Boolean) as TranscriptInsight[];
+    // ── Transcripts via call_transcript_contacts junction ────────────────────
+    const tcRes = (await supabase
+      .from("call_transcript_contacts")
+      .select("call_transcript_id")
+      .in("contact_id", contactIds)
+      .limit(500)) as QueryResult<Record<string, unknown>>;
+    if (tcRes.error) {
+      warnings.push(`call_transcript_contacts query failed: ${tcRes.error.message}`);
+    } else {
+      const transcriptIds = [...new Set((tcRes.data ?? []).map((r) => coerceString(r.call_transcript_id)).filter(Boolean) as string[])].slice(0, 100);
+      if (transcriptIds.length > 0) {
+        const trRes = (await supabase
+          .from("call_transcripts")
+          .select("id,title,summary,started_at")
+          .in("id", transcriptIds)
+          .order("started_at", { ascending: false })
+          .limit(50)) as QueryResult<Record<string, unknown>>;
+        if (trRes.error) {
+          warnings.push(`call_transcripts query failed: ${trRes.error.message}`);
+        } else {
+          detail.transcriptInsights = (trRes.data ?? [])
+            .map((t) => {
+              const summary = coerceString(t.summary);
+              if (!summary) return null;
+              return {
+                id: coerceString(t.id),
+                title: coerceString(t.title),
+                summary,
+                signals: [],
+              } satisfies TranscriptInsight;
+            })
+            .filter(Boolean) as TranscriptInsight[];
+        }
+      }
+    }
   }
 
   return detail;
 }
-

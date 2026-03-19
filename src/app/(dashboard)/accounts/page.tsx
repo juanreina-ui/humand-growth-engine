@@ -3,8 +3,9 @@ import { getAccountsOverview, getAccountsSignals } from "@/lib/db/queries";
 import { scoreAccountFromDetail } from "@/lib/growth/scoring";
 import { getStatusLabel } from "@/lib/growth/status";
 import { Badge } from "@/ui/Badge";
-import { formatCompactNumber } from "@/lib/growth/format";
-import { AccountsChatDrawer, type ChatAccount } from "@/ui/AccountsChatDrawer";
+import { formatCompactNumber, formatRevenue } from "@/lib/growth/format";
+import { AccountsPageActions } from "@/ui/AccountsPageActions";
+import type { ChatAccount } from "@/ui/AccountsChat";
 import { Tooltip } from "@/ui/Tooltip";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +98,7 @@ export default async function AccountsPage({
     companyName: r.companyName,
     ownerName: r.ownerName ?? null,
     companySize: r.companySize ?? null,
+    companyRevenue: r.companyRevenue ?? null,
     growthScore: r.scored.growthScore,
     status: r.status,
     recentMeetings: r.scored.recentMeetings,
@@ -125,8 +127,14 @@ export default async function AccountsPage({
             {rows.length} account{rows.length === 1 ? "" : "s"} · ranked by growth score
           </p>
         </div>
-        <AccountsChatDrawer accounts={chatAccounts} />
       </div>
+
+      {/* Actions: Ask AI button + chat drawer */}
+      <AccountsPageActions
+        accounts={chatAccounts}
+        priorityAccounts={[]}
+        showPriority={false}
+      />
 
       {/* Stat strip */}
       <div className="grid grid-cols-4 gap-3">
@@ -151,6 +159,7 @@ export default async function AccountsPage({
           <thead>
             <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500">
               <th className="px-4 py-3">Account</th>
+              <th className="px-4 py-3">Revenue</th>
               <th className="px-4 py-3">Owner</th>
               <th className="px-4 py-3">
                 <Tooltip content={SCORE_TOOLTIP}>
@@ -192,6 +201,11 @@ export default async function AccountsPage({
                     </Tooltip>
                   </div>
                 </td>
+                <td className="px-4 py-3">
+                  <span className="font-semibold tabular-nums text-zinc-900">
+                    {formatRevenue(r.companyRevenue)}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-zinc-600">
                   {r.ownerName ?? <span className="text-zinc-400">Unassigned</span>}
                 </td>
@@ -229,7 +243,7 @@ export default async function AccountsPage({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
                   No accounts found.
                 </td>
               </tr>

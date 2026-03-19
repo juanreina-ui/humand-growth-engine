@@ -5,6 +5,7 @@ import { Card } from "@/ui/Card";
 import { Badge } from "@/ui/Badge";
 import { OutreachMessageGenerator } from "@/ui/OutreachMessageGenerator";
 import { Tooltip } from "@/ui/Tooltip";
+import { formatRevenue } from "@/lib/growth/format";
 
 type Insights = {
   headline: string;
@@ -56,6 +57,7 @@ type ScoredMetrics = {
 type Props = {
   companyName: string;
   companySummary?: string;
+  companyRevenue?: number;
   scored: ScoredMetrics;
   insights: Insights;
   deals: Deal[];
@@ -138,6 +140,7 @@ function MetricPill({
 export function AccountDetailTabs({
   companyName,
   companySummary,
+  companyRevenue,
   scored,
   insights,
   deals,
@@ -172,7 +175,19 @@ export function AccountDetailTabs({
       {tab === "insights" && (
         <div className="space-y-4">
           {/* Metrics strip */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className={`grid gap-3 ${companyRevenue ? "grid-cols-5" : "grid-cols-4"}`}>
+            {companyRevenue && (
+              <Tooltip content="Annual recurring revenue or annual revenue as reported. Used to weight the company size component of the growth score.">
+                <div className="w-full rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <div className="text-xl font-semibold tabular-nums text-emerald-700">
+                    {formatRevenue(companyRevenue)}
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1 text-xs text-emerald-600">
+                    Annual revenue
+                  </div>
+                </div>
+              </Tooltip>
+            )}
             <MetricPill label="Recent meetings" value={scored.recentMeetings} color="text-emerald-600" tooltipKey="meetings" />
             <MetricPill label="Open deals" value={scored.openDeals} color="text-sky-600" tooltipKey="deals" />
             <MetricPill label="Engaged contacts" value={scored.engagedContacts} color="text-amber-600" tooltipKey="contacts" />

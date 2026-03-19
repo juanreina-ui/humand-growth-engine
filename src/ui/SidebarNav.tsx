@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 
-const NAV = [
+const ACCOUNTS_NAV = [
   {
     label: "All accounts",
     href: "/accounts",
@@ -46,6 +46,9 @@ export function SidebarNav() {
   const searchParams = useSearchParams();
   const filter = searchParams.get("filter");
 
+  const isDashboard = pathname === "/dashboard";
+  const isPriorityActions = pathname === "/priority-actions";
+
   return (
     <aside className="sticky top-0 flex h-screen w-56 shrink-0 flex-col bg-zinc-900">
       {/* Logo */}
@@ -61,10 +64,46 @@ export function SidebarNav() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 px-3 py-4">
+        {/* Overview section */}
         <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
+          Overview
+        </div>
+        <Link
+          href="/priority-actions"
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-colors ${
+            isPriorityActions
+              ? "bg-white/10 font-medium text-white"
+              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          }`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M8 2L1.5 13h13L8 2z" />
+            <path d="M8 7v3M8 11.5v.5" />
+          </svg>
+          Priority Actions
+        </Link>
+        <Link
+          href="/dashboard"
+          className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] transition-colors ${
+            isDashboard
+              ? "bg-white/10 font-medium text-white"
+              : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+          }`}
+        >
+          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="1" width="6" height="8" rx="1.5" />
+            <rect x="9" y="1" width="6" height="4" rx="1.5" />
+            <rect x="9" y="7" width="6" height="8" rx="1.5" />
+            <rect x="1" y="11" width="6" height="4" rx="1.5" />
+          </svg>
+          Dashboard
+        </Link>
+
+        {/* Accounts section */}
+        <div className="mb-2 mt-4 px-3 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
           Accounts
         </div>
-        {NAV.map((item) => {
+        {ACCOUNTS_NAV.map((item) => {
           const isActive =
             pathname === "/accounts" &&
             (item.filter === null ? !filter : filter === item.filter);

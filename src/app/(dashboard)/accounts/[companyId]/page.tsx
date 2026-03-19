@@ -14,6 +14,7 @@ import {
   buildScoreInsight,
 } from "@/lib/ai/growthAi";
 import { AccountDetailTabs } from "@/ui/AccountDetailTabs";
+import { formatRevenue } from "@/lib/growth/format";
 
 export const dynamic = "force-dynamic";
 
@@ -76,13 +77,23 @@ export default async function AccountDetailPage({
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10">
-            <span className="text-3xl font-bold tabular-nums text-white">
-              {scored.growthScore}
-            </span>
-            <div className="text-left">
-              <div className="text-[11px] font-medium text-zinc-400">Growth</div>
-              <div className="text-[11px] text-zinc-500">/ 100</div>
+          <div className="flex items-center gap-3">
+            {base.companyRevenue && (
+              <div className="rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10">
+                <div className="text-[11px] font-medium text-zinc-400">Annual Revenue</div>
+                <div className="text-xl font-bold tabular-nums text-emerald-400">
+                  {formatRevenue(base.companyRevenue)}
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 ring-1 ring-white/10">
+              <span className="text-3xl font-bold tabular-nums text-white">
+                {scored.growthScore}
+              </span>
+              <div className="text-left">
+                <div className="text-[11px] font-medium text-zinc-400">Growth</div>
+                <div className="text-[11px] text-zinc-500">/ 100</div>
+              </div>
             </div>
           </div>
         </div>
@@ -112,6 +123,7 @@ export default async function AccountDetailPage({
       <AccountDetailTabs
         companyName={base.companyName}
         companySummary={detail.companySummary}
+        companyRevenue={base.companyRevenue}
         scored={{
           recentMeetings: scored.recentMeetings,
           openDeals: scored.openDeals,

@@ -8,7 +8,7 @@ import { AccountsPageActions } from "@/ui/AccountsPageActions";
 import type { ChatAccount } from "@/ui/AccountsChat";
 import { Tooltip } from "@/ui/Tooltip";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300; // revalidate every 5 minutes
 
 const SCORE_TOOLTIP =
   "Growth score (0–100) combines: recent meetings (up to 25 pts), open deals (up to 25 pts), engaged contacts (up to 20 pts), company size (up to 20 pts), and transcript need signals (up to 20 pts). Positive sentiment adds 6 pts; negative subtracts 6 pts.";

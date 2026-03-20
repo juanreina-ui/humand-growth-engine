@@ -7,16 +7,10 @@ import {
 import { scoreAccountFromDetail } from "@/lib/growth/scoring";
 import { getStatusLabel } from "@/lib/growth/status";
 import { Badge } from "@/ui/Badge";
-import {
-  explainScore,
-  featureGapAnalysis,
-  nextBestAction,
-  buildScoreInsight,
-} from "@/lib/ai/growthAi";
 import { AccountDetailTabs } from "@/ui/AccountDetailTabs";
 import { formatRevenue } from "@/lib/growth/format";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300; // revalidate every 5 minutes
 
 export default async function AccountDetailPage({
   params,
@@ -25,13 +19,16 @@ export default async function AccountDetailPage({
 }) {
   const { companyId } = await params;
 
-  const base = await getAccountsOverviewById(companyId);
+  // Fetch both in parallel — the main perf win
+  const [base, detail] = await Promise.all([
+    getAccountsOverviewById(companyId),
+    getAccountDetail(companyId),
+  ]);
+
   if (!base) notFound();
 
-  const detail = await getAccountDetail(companyId);
   const scored = scoreAccountFromDetail(base, detail);
   const statusLabel = getStatusLabel(scored);
-  const scoreInsight = buildScoreInsight(scored, base.companyName);
 
   const statusColor =
     statusLabel === "High expansion potential"
@@ -127,6 +124,7 @@ export default async function AccountDetailPage({
         ownerName={base.ownerName}
         status={statusLabel}
         scored={{
+          growthScore: scored.growthScore,
           recentMeetings: scored.recentMeetings,
           openDeals: scored.openDeals,
           engagedContacts: scored.engagedContacts,
@@ -134,14 +132,6 @@ export default async function AccountDetailPage({
           riskSignals: scored.riskSignals,
           sentiment: scored.sentiment,
           topOpportunity: scored.topOpportunity,
-        }}
-        insights={{
-          headline: scoreInsight.headline,
-          bullets: scoreInsight.bullets,
-          recommendedExpansion: scoreInsight.recommendedExpansion,
-          explanation: explainScore(scored),
-          gaps: featureGapAnalysis(scored),
-          nba: nextBestAction(scored),
         }}
         deals={detail.deals}
         meetings={detail.meetings}

@@ -6,8 +6,16 @@ import { Badge } from "@/ui/Badge";
 import { OutreachMessageGenerator } from "@/ui/OutreachMessageGenerator";
 import { Tooltip } from "@/ui/Tooltip";
 import { formatRevenue } from "@/lib/growth/format";
+import {
+  buildScoreInsight,
+  explainScore,
+  featureGapAnalysis,
+  nextBestAction,
+} from "@/lib/ai/growthAi";
 
-type Insights = {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type GeneratedInsight = {
   headline: string;
   bullets: string[];
   recommendedExpansion: string;
@@ -48,6 +56,7 @@ type Transcript = {
 };
 
 type ScoredMetrics = {
+  growthScore: number;
   recentMeetings: number;
   openDeals: number;
   engagedContacts: number;
@@ -64,7 +73,6 @@ type Props = {
   ownerName?: string | null;
   status: string;
   scored: ScoredMetrics;
-  insights: Insights;
   deals: Deal[];
   meetings: Meeting[];
   contacts: Contact[];
@@ -72,6 +80,9 @@ type Props = {
 };
 
 type Tab = "insights" | "activity" | "contacts";
+type AIState = "idle" | "loading" | "ready";
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function TabBtn({
   active,
@@ -142,6 +153,8 @@ function MetricPill({
   );
 }
 
+// ─── Main component ───────────────────────────────────────────────────────────
+
 export function AccountDetailTabs({
   companyName,
   companySummary,
@@ -149,13 +162,43 @@ export function AccountDetailTabs({
   ownerName,
   status,
   scored,
-  insights,
   deals,
   meetings,
   contacts,
   transcriptInsights,
 }: Props) {
   const [tab, setTab] = useState<Tab>("insights");
+  const [aiState, setAiState] = useState<AIState>("idle");
+  const [aiInsight, setAiInsight] = useState<GeneratedInsight | null>(null);
+
+  function generateInsight() {
+    setAiState("loading");
+    // Compute synchronously but show a brief loading state so it feels intentional
+    const scoredForAI = {
+      growthScore: scored.growthScore,
+      recentMeetings: scored.recentMeetings,
+      openDeals: scored.openDeals,
+      engagedContacts: scored.engagedContacts,
+      companySizeScore: 0,
+      needSignals: scored.needSignals,
+      sentiment: scored.sentiment as "positive" | "neutral" | "negative",
+      riskSignals: scored.riskSignals,
+      topOpportunity: scored.topOpportunity,
+      suggestedNextAction: "",
+    };
+    setTimeout(() => {
+      const insight = buildScoreInsight(scoredForAI, companyName);
+      setAiInsight({
+        headline: insight.headline,
+        bullets: insight.bullets,
+        recommendedExpansion: insight.recommendedExpansion,
+        explanation: explainScore(scoredForAI),
+        gaps: featureGapAnalysis(scoredForAI),
+        nba: nextBestAction(scoredForAI),
+      });
+      setAiState("ready");
+    }, 900);
+  }
 
   return (
     <div className="space-y-4">
@@ -207,81 +250,138 @@ export function AccountDetailTabs({
             </div>
           )}
 
-          {/* Main insight card */}
-          <Card>
-            <div className="flex items-center gap-1.5">
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                AI Insight
-              </div>
-              <Tooltip content="Generated from growth score, engagement signals, open deals, and transcript summaries. Recalculated on every page load.">
-                <svg
-                  className="h-3 w-3 text-zinc-300"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="8" cy="8" r="6" />
-                  <path d="M8 7v1M8 10.5v.5" />
+          {/* AI Insight — idle state */}
+          {aiState === "idle" && (
+            <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-6 py-10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
+                <svg className="h-5 w-5 text-white" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42" />
+                  <circle cx="8" cy="8" r="2.5" fill="currentColor" stroke="none" />
                 </svg>
-              </Tooltip>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-zinc-900">AI insights not yet generated</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Click below to generate a personalized growth analysis for {companyName}.
+                </p>
+              </div>
+              <button
+                onClick={generateInsight}
+                className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-zinc-700"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.42 1.42M11.53 11.53l1.42 1.42M3.05 12.95l1.42-1.42M11.53 4.47l1.42-1.42" />
+                  <circle cx="8" cy="8" r="2.5" fill="currentColor" stroke="none" />
+                </svg>
+                Generate AI Insight
+              </button>
             </div>
-            <div className="mt-2 text-base font-semibold text-zinc-900">
-              {insights.headline}
-            </div>
-            <ul className="mt-3 space-y-1.5">
-              {insights.bullets.map((b) => (
-                <li key={b} className="flex items-start gap-2 text-sm text-zinc-700">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300" />
-                  {b.replace(/^•\s*/, "")}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700">
-              {insights.recommendedExpansion}
-            </div>
-            <OutreachMessageGenerator
-              companyName={companyName}
-              status={status}
-              sentiment={scored.sentiment}
-              recentMeetings={scored.recentMeetings}
-              openDeals={scored.openDeals}
-              engagedContacts={scored.engagedContacts}
-              needSignals={scored.needSignals}
-              riskSignals={scored.riskSignals}
-              topOpportunity={scored.topOpportunity}
-              ownerName={ownerName}
-              companyRevenue={companyRevenue}
-            />
-          </Card>
+          )}
 
-          {/* Next best action */}
-          <Card>
-            <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              Next best action
+          {/* AI Insight — loading state */}
+          {aiState === "loading" && (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-10">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900">
+                <svg className="h-5 w-5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-semibold text-zinc-900">Analyzing account signals…</p>
+                <p className="mt-1 text-xs text-zinc-500">Vejj is reviewing engagement data and generating your insight.</p>
+              </div>
             </div>
-            <div className="mt-2 text-sm text-zinc-800">{insights.nba}</div>
-          </Card>
+          )}
 
-          {/* Explanation + gaps */}
-          <div className="grid grid-cols-2 gap-4">
-            <Card>
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Score explanation
+          {/* AI Insight — ready state */}
+          {aiState === "ready" && aiInsight && (
+            <>
+              {/* Main insight card */}
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      AI Insight
+                    </div>
+                    <Tooltip content="Generated from growth score, engagement signals, open deals, and transcript summaries.">
+                      <svg
+                        className="h-3 w-3 text-zinc-300"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="8" cy="8" r="6" />
+                        <path d="M8 7v1M8 10.5v.5" />
+                      </svg>
+                    </Tooltip>
+                  </div>
+                  <button
+                    onClick={generateInsight}
+                    className="text-[11px] font-medium text-zinc-400 transition hover:text-zinc-700"
+                  >
+                    Regenerate ↺
+                  </button>
+                </div>
+                <div className="mt-2 text-base font-semibold text-zinc-900">
+                  {aiInsight.headline}
+                </div>
+                <ul className="mt-3 space-y-1.5">
+                  {aiInsight.bullets.map((b) => (
+                    <li key={b} className="flex items-start gap-2 text-sm text-zinc-700">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-zinc-300" />
+                      {b.replace(/^•\s*/, "")}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-4 rounded-xl bg-zinc-50 p-3 text-sm text-zinc-700">
+                  {aiInsight.recommendedExpansion}
+                </div>
+                <OutreachMessageGenerator
+                  companyName={companyName}
+                  status={status}
+                  sentiment={scored.sentiment}
+                  recentMeetings={scored.recentMeetings}
+                  openDeals={scored.openDeals}
+                  engagedContacts={scored.engagedContacts}
+                  needSignals={scored.needSignals}
+                  riskSignals={scored.riskSignals}
+                  topOpportunity={scored.topOpportunity}
+                  ownerName={ownerName}
+                  companyRevenue={companyRevenue}
+                />
+              </Card>
+
+              {/* Next best action */}
+              <Card>
+                <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                  Next best action
+                </div>
+                <div className="mt-2 text-sm text-zinc-800">{aiInsight.nba}</div>
+              </Card>
+
+              {/* Explanation + gaps */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Score explanation
+                  </div>
+                  <div className="mt-2 text-sm text-zinc-700">{aiInsight.explanation}</div>
+                </Card>
+                <Card>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                    Feature gap analysis
+                  </div>
+                  <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">
+                    {aiInsight.gaps}
+                  </div>
+                </Card>
               </div>
-              <div className="mt-2 text-sm text-zinc-700">{insights.explanation}</div>
-            </Card>
-            <Card>
-              <div className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Feature gap analysis
-              </div>
-              <div className="mt-2 whitespace-pre-wrap text-sm text-zinc-700">
-                {insights.gaps}
-              </div>
-            </Card>
-          </div>
+            </>
+          )}
         </div>
       )}
 
